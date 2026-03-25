@@ -1,11 +1,10 @@
-// src/pages/Login.tsx
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Mail, Lock, Loader2, Eye, EyeOff, Cloud, Shield, CheckCircle, ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Mail, Lock, Loader2, Eye, EyeOff, Cloud, Shield, CheckCircle, ArrowRight, KeyRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { login } from "@/services/authService";
+import { login, forgotPassword, resetPassword } from "@/services/authService";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -14,10 +13,21 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  
-  const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetMsg, setResetMsg] = useState("");
+  const [resetError, setResetError] = useState("");
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -30,237 +40,255 @@ export default function LoginPage() {
 
     try {
       const res = await login({ username, password });
-      
-      if (res.token) {
-        localStorage.setItem("token", res.token);
+      if (res.code === 200 && res.data?.token) {
+        localStorage.setItem("token", res.data.token);
+        if (rememberMe) localStorage.setItem("remember-username", username);
+        else localStorage.removeItem("remember-username");
         navigate("/");
       } else {
-        setError("登录成功但未获取到 Token");
+        setError(res.message || "登录失败");
       }
     } catch (err: any) {
-      console.error(err);
-      const msg = err.response?.data?.message || err.message || "登录失败，请检查账号密码";
-      setError(msg);
+      if (err.code === "ERR_NETWORK" || err.code === "ECONNABORTED") {
+        setError("无法连接到服务器，请检查网络连接或稍后重试");
+      } else if (err.response?.status === 401) {
+        setError(err.response?.data?.message || "用户名或密码错误");
+      } else {
+        setError(err.response?.data?.message || err.message || "登录失败，请稍后重试");
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const openResetModal = () => {
+    setResetOpen(true);
+    setResetError("");
+    setResetMsg("");
+  };
+
+  const closeResetModal = () => {
+    setResetOpen(false);
+    setResetToken("");
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setResetError("");
+    setResetMsg("");
+  };
+
+  const handleSendResetCode = async () => {
+    setResetError("");
+    setResetMsg("");
+    if (!resetEmail) {
+      setResetError("请输入邮箱");
+      return;
+    }
+
+    try {
+      setSendingCode(true);
+      const res = await forgotPassword({ email: resetEmail });
+      if (res.code === 200) setResetMsg(res.message || res.msg || "验证码已发送，请查收邮箱");
+      else setResetError(res.message || res.msg || "发送失败");
+    } catch (err: any) {
+      setResetError(err.response?.data?.message || err.message || "发送失败");
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    setResetError("");
+    setResetMsg("");
+
+    if (!resetToken || !newPassword) {
+      setResetError("请填写重置令牌和新密码");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setResetError("新密码至少 6 位");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setResetError("两次输入的新密码不一致");
+      return;
+    }
+
+    try {
+      setResetting(true);
+      const res = await resetPassword({ token: resetToken, new_password: newPassword });
+      if (res.code === 200) {
+        setResetMsg(res.message || res.msg || "密码重置成功，请使用新密码登录");
+        setTimeout(() => closeResetModal(), 1200);
+      } else {
+        setResetError(res.message || res.msg || "重置失败");
+      }
+    } catch (err: any) {
+      setResetError(err.response?.data?.message || err.message || "重置失败");
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  useEffect(() => {
+    const remembered = localStorage.getItem("remember-username");
+    if (remembered) {
+      setUsername(remembered);
+      setRememberMe(true);
+    }
+
+    const params = new URLSearchParams(location.search);
+    const resetFlag = params.get("reset") === "1";
+    const tokenFromUrl = params.get("token") || "";
+    const isResetPath = location.pathname === "/reset-password";
+
+    if (tokenFromUrl) {
+      setResetToken(tokenFromUrl);
+      setResetOpen(true);
+      setResetError("");
+      setResetMsg("检测到邮件重置链接，请直接输入新密码并提交");
+      return;
+    }
+
+    if (resetFlag || isResetPath) {
+      openResetModal();
+    }
+  }, [location.pathname, location.search]);
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Top Navigation */}
-      <header className="px-8 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-[#f8fbff] via-[#f5f7ff] to-[#eef3ff] dark:from-[#020617] dark:via-[#0b1224] dark:to-[#0f172a] flex flex-col">
+      <header className="px-8 py-5 flex items-center justify-between bg-white/70 dark:bg-[#0f172a]/70 backdrop-blur-sm border-b border-white/30 dark:border-[#1e293b]">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+          <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
             <Cloud className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-bold text-slate-900">个人云盘</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-slate-600">支持</span>
-          <Button 
-            variant="default"
-            className="bg-blue-600 hover:bg-blue-700"
-            onClick={() => navigate("/register")}
-          >
-            帮助
-          </Button>
+          <span className="text-xl font-semibold text-slate-900 dark:text-white">个人云盘</span>
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 bg-white rounded-2xl shadow-2xl overflow-hidden">
-          {/* Left Side - Login Form */}
-          <div className="p-12">
-            <div className="max-w-md mx-auto">
-              <h1 className="text-3xl font-bold text-slate-900 mb-2">欢迎回来</h1>
-              <p className="text-slate-600 mb-8">随时随地安全访问你的个人文件</p>
+      <div className="flex-1 flex items-center justify-center p-6 md:p-8">
+        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 bg-white/90 dark:bg-[#0f172a]/95 rounded-3xl shadow-2xl overflow-hidden border border-white/40 dark:border-[#1e293b] min-h-[650px]">
+          <div className="p-8 md:p-12 flex items-center dark:bg-[#0b1222]">
+            <div className="w-full max-w-md mx-auto">
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">欢迎回来</h1>
+              <p className="text-slate-500 dark:text-slate-300 mb-8 text-sm">随时随地安全访问您的个人文件</p>
 
-              {error && (
-                <div className="mb-6 p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-200">
-                  {error}
-                </div>
-              )}
+              {error && <div className="mb-6 p-3 text-sm text-red-600 bg-red-50 dark:bg-red-500/10 rounded-lg border border-red-200 dark:border-red-500/30">{error}</div>}
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="username" className="text-sm font-medium text-slate-700">
-                    邮箱或用户名
-                  </Label>
+                  <Label htmlFor="username" className="text-sm font-medium text-slate-700 dark:text-slate-200">邮箱或用户名</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input
-                      id="username"
-                      type="text"
-                      placeholder="name@example.com"
-                      className="pl-10 h-12 bg-slate-50 border-slate-200"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      disabled={loading}
-                      autoComplete="username"
-                    />
+                    <Input id="username" type="text" placeholder="name@example.com" className="pl-10 h-11 bg-slate-50 dark:bg-[#111b31] border-slate-200 dark:border-[#334155] rounded-lg" value={username} onChange={(e) => setUsername(e.target.value)} disabled={loading} autoComplete="username" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-sm font-medium text-slate-700">
-                      密码
-                    </Label>
-                    <button
-                      type="button"
-                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                      忘记密码？
-                    </button>
+                    <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-200">密码</Label>
+                    <button type="button" onClick={openResetModal} className="text-sm text-blue-600 hover:text-blue-700 font-medium">忘记密码？</button>
                   </div>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      className="pl-10 pr-10 h-12 bg-slate-50 border-slate-200"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={loading}
-                      autoComplete="current-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                      disabled={loading}
-                    >
+                    <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="pl-10 pr-10 h-11 bg-slate-50 dark:bg-[#111b31] border-slate-200 dark:border-[#334155] rounded-lg" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} autoComplete="current-password" />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" disabled={loading}>
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="remember"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-                  />
-                  <label
-                    htmlFor="remember"
-                    className="text-sm text-slate-600 cursor-pointer"
-                  >
-                    记住我
-                  </label>
+                  <input type="checkbox" id="remember" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500" />
+                  <label htmlFor="remember" className="text-sm text-slate-600 dark:text-slate-300 cursor-pointer">记住我</label>
                 </div>
 
-                <Button
-                  type="submit"
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium text-base"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      登录中...
-                    </>
-                  ) : (
-                    <>
-                      登录
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </>
-                  )}
+                <Button type="submit" className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium text-base rounded-lg" disabled={loading}>
+                  {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />登录中...</> : <>登录<ArrowRight className="ml-2 h-4 w-4" /></>}
                 </Button>
 
-                <div className="text-center text-sm text-slate-600">
-                  还没有账号？{' '}
-                  <button
-                    type="button"
-                    onClick={() => navigate("/register")}
-                    className="text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    立即注册
-                  </button>
-                </div>
+                <div className="text-center text-sm text-slate-600 dark:text-slate-300 pt-2">还没有账号？ <button type="button" onClick={() => navigate("/register")} className="text-blue-600 hover:text-blue-700 font-medium">立即注册</button></div>
               </form>
             </div>
           </div>
 
-          {/* Right Side - Feature Showcase */}
-          <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-blue-900 p-12 text-white overflow-hidden">
-            {/* Background Pattern */}
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute inset-0" style={{
-                backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.1) 35px, rgba(255,255,255,.1) 70px)',
-              }}></div>
-            </div>
-
+          <div className="relative bg-gradient-to-br from-blue-700 via-blue-800 to-blue-950 p-12 text-white overflow-hidden hidden lg:block">
             <div className="relative z-10 h-full flex flex-col justify-between">
-              {/* Top Card */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                    <Shield className="w-6 h-6" />
-                  </div>
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-2xl">
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0"><Shield className="w-6 h-6" /></div>
                   <div>
-                    <h3 className="font-semibold text-lg">端到端加密</h3>
-                    <p className="text-sm text-blue-100">您的数据始终受保护</p>
+                    <h3 className="font-semibold text-lg mb-1">端到端加密</h3>
+                    <p className="text-sm text-blue-100">您的数据由您掌控</p>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-                    <div className="h-full w-3/4 bg-white/60 rounded-full"></div>
-                  </div>
-                  <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-                    <div className="h-full w-full bg-white/60 rounded-full"></div>
-                  </div>
+                <div className="space-y-2.5">
+                  <div className="h-2 bg-white/20 rounded-full overflow-hidden"><div className="h-full w-3/4 bg-white/70 rounded-full" /></div>
+                  <div className="h-2 bg-white/20 rounded-full overflow-hidden"><div className="h-full w-1/2 bg-white/50 rounded-full" /></div>
+                  <div className="h-2 bg-white/20 rounded-full overflow-hidden"><div className="h-full w-full bg-white/70 rounded-full" /></div>
                 </div>
               </div>
 
-              {/* Middle Content */}
               <div className="text-center py-8">
                 <h2 className="text-3xl font-bold mb-4">企业级安全保障</h2>
-                <p className="text-blue-100 text-lg mb-8">
-                  加入超过 200 万用户的行列，信任我们的云<br />
-                  基础设施来保护他们最敏感的数字资产。
-                </p>
+                <p className="text-blue-100 text-lg leading-relaxed mb-8">加密、备份、隐私三重保护，守护您的数字资产</p>
                 <div className="flex justify-center gap-8">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5" />
-                    <span className="text-sm">数据加密</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5" />
-                    <span className="text-sm">安全备份</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5" />
-                    <span className="text-sm">隐私保护</span>
-                  </div>
+                  <div className="flex items-center gap-2"><CheckCircle className="w-5 h-5" /><span className="text-sm">数据加密</span></div>
+                  <div className="flex items-center gap-2"><CheckCircle className="w-5 h-5" /><span className="text-sm">安全备份</span></div>
+                  <div className="flex items-center gap-2"><CheckCircle className="w-5 h-5" /><span className="text-sm">隐私保护</span></div>
                 </div>
               </div>
 
-              {/* Bottom Icons */}
-              <div className="flex justify-center gap-6 opacity-60">
-                <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6" />
-                </div>
-                <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">
-                  <Shield className="w-6 h-6" />
-                </div>
-                <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">
-                  <Cloud className="w-6 h-6" />
-                </div>
+              <div className="flex justify-center gap-6">
+                <div className="w-14 h-14 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10"><CheckCircle className="w-7 h-7" /></div>
+                <div className="w-14 h-14 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10"><Shield className="w-7 h-7" /></div>
+                <div className="w-14 h-14 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10"><Cloud className="w-7 h-7" /></div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="px-8 py-4 text-center text-sm text-slate-500">
-        2024 Personal Cloud Drive Inc. · 使用条款和政策 · 隐私政策 · 商务登录
-      </footer>
+      <footer className="px-8 py-4 text-center text-xs text-slate-500 dark:text-slate-400">© 2024 Personal Cloud Drive Inc. 隐私政策 · 服务条款</footer>
+
+      {resetOpen && (
+        <div className="fixed inset-0 z-[90] bg-black/45 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-[#e2e8f0] dark:border-[#334155]">
+            <div className="p-5 border-b border-[#e2e8f0] dark:border-[#334155] flex items-center justify-between">
+              <h3 className="text-lg font-bold text-[#0f172a] dark:text-white flex items-center gap-2"><KeyRound className="w-5 h-5" />重置密码</h3>
+              <button onClick={closeResetModal} className="p-2 rounded-lg hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b]"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              {resetError && <div className="p-2.5 rounded-lg text-sm text-red-600 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30">{resetError}</div>}
+              {resetMsg && <div className="p-2.5 rounded-lg text-sm text-emerald-700 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30">{resetMsg}</div>}
+
+              <div className="space-y-1.5">
+                <Label>邮箱</Label>
+                <Input value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="请输入注册邮箱" />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>重置令牌（邮箱中的 token）</Label>
+                <div className="space-y-2">
+                  <Input value={resetToken} onChange={(e) => setResetToken(e.target.value)} placeholder="请输入邮件中的重置令牌" />
+                  <Button type="button" variant="outline" onClick={handleSendResetCode} disabled={sendingCode} className="w-full">{sendingCode ? "发送中" : "发送重置邮件"}</Button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>新密码</Label>
+                <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="至少 6 位" />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>确认新密码</Label>
+                <Input type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder="再次输入新密码" />
+              </div>
+
+              <Button type="button" className="w-full" onClick={handleResetPassword} disabled={resetting}>{resetting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />重置中...</> : "确认重置"}</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

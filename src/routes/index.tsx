@@ -32,6 +32,11 @@ export const routes = [
     meta: { title: '注册', public: true }
   },
   {
+    path: '/reset-password',
+    element: <LoginPage />,
+    meta: { title: '重置密码', public: true }
+  },
+  {
     path: '/s/:code',
     element: <ShareAccess />,
     meta: { title: '分享访问', public: true }

@@ -29,15 +29,21 @@ apiClient.interceptors.response.use(
     // 401 未授权：Token 过期或未登录
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      // 只有不在登录页时才跳转
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
       return Promise.reject(error);
     }
 
     // 网络错误或服务器未启动
     if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED' || !error.response) {
-      console.error('服务器连接失败，跳转到登录页');
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      console.error('服务器连接失败');
+      // 只有不在登录页时才跳转和清除 token
+      if (window.location.pathname !== '/login') {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
       return Promise.reject(error);
     }
 

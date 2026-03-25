@@ -5,6 +5,14 @@ import { Lock, User, Mail, Loader2, Eye, EyeOff, Cloud, Shield, CheckCircle, Arr
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { register } from "@/services/authService";
 
 export default function RegisterPage() {
@@ -16,7 +24,8 @@ export default function RegisterPage() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,16 +58,32 @@ export default function RegisterPage() {
     }
 
     try {
-      await register({ username, password, email });
-      alert("注册成功！请登录");
-      navigate("/login");
+      const res = await register({ username, password, email });
+      if (res.code === 200) {
+        setShowSuccessDialog(true);
+      } else {
+        setError(res.message || "注册失败");
+      }
     } catch (err: any) {
       console.error(err);
-      const msg = err.response?.data?.message || err.message || "注册失败，请稍后重试";
-      setError(msg);
+
+      // 根据不同的错误类型显示不同的提示
+      if (err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED') {
+        setError("无法连接到服务器，请检查网络连接或稍后重试");
+      } else if (err.response?.status === 409) {
+        setError(err.response?.data?.message || "用户名或邮箱已被注册");
+      } else {
+        const msg = err.response?.data?.message || err.message || "注册失败，请稍后重试";
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSuccessDialogClose = () => {
+    setShowSuccessDialog(false);
+    navigate("/login");
   };
 
   return (
@@ -314,6 +339,31 @@ export default function RegisterPage() {
       <footer className="px-8 py-4 text-center text-sm text-slate-500">
         © 2024 Personal Cloud Drive Inc. · 使用条款和政策 · 隐私政策 · 商务登录
       </footer>
+
+      {/* Success Dialog */}
+      <AlertDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+              <AlertDialogTitle className="text-xl">注册成功！</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-base text-slate-600">
+              您的账户已创建成功，现在可以使用您的账号登录了。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              onClick={handleSuccessDialogClose}
+              className="w-full h-11 bg-blue-600 hover:bg-blue-700"
+            >
+              前往登录
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

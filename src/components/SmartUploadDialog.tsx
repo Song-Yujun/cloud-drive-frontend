@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X, Upload, FileIcon, CheckCircle2, AlertCircle } from "lucide-react";
 import { calculateFileHash, createFileChunks } from "@/utils/fileHash";
 import { checkFile, uploadChunk, mergeChunks, uploadFile } from "@/services/fileService";
@@ -9,6 +9,8 @@ interface SmartUploadDialogProps {
   onClose: () => void;
   onSuccess: () => void;
   parentId?: number | null;
+  droppedFiles?: File[];
+  onDroppedFilesHandled?: () => void;
 }
 
 interface UploadTask {
@@ -22,10 +24,32 @@ interface UploadTask {
   useChunked?: boolean; // 是否使用分片上传
 }
 
-export default function SmartUploadDialog({ open, onClose, onSuccess, parentId }: SmartUploadDialogProps) {
+export default function SmartUploadDialog({
+  open,
+  onClose,
+  onSuccess,
+  parentId,
+  droppedFiles = [],
+  onDroppedFilesHandled,
+}: SmartUploadDialogProps) {
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setIsDragging(false);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (open && droppedFiles.length > 0) {
+      const dt = new DataTransfer();
+      droppedFiles.forEach((file) => dt.items.add(file));
+      handleFileSelect(dt.files);
+      onDroppedFilesHandled?.();
+    }
+  }, [open, droppedFiles, onDroppedFilesHandled]);
 
   const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk
   const CHUNKED_THRESHOLD = 10 * 1024 * 1024; // 10MB 以上使用分片上传

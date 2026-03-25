@@ -1,38 +1,33 @@
 import { useEffect, useState } from "react";
-import { Clock, FileText, Image, Video, File, Plus } from "lucide-react";
+import { Clock, Plus } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import Toast from "@/components/Toast";
-import { getFiles } from "@/services/fileService";
+import SmartUploadDialog from "@/components/SmartUploadDialog";
+import { getRecentFiles, getThumbnailUrl, getPreviewUrl } from "@/services/fileService";
 import type { FileItem } from "@/services/fileService";
 import { getFileIcon, formatFileSize, formatDate } from "@/utils/fileUtils";
 
 export default function Recent() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState<{ open: boolean; message: string; type: "success" | "error" | "warning" | "info" }>({ 
-    open: false, message: "", type: "info" 
+  const [toast, setToast] = useState<{ open: boolean; message: string; type: "success" | "error" | "warning" | "info" }>({
+    open: false,
+    message: "",
+    type: "info"
   });
   const [showUploadDialog, setShowUploadDialog] = useState(false);
 
   useEffect(() => {
-    fetchRecentFiles();
+    fetchRecent();
   }, []);
 
-  const fetchRecentFiles = async () => {
+  const fetchRecent = async () => {
     setLoading(true);
     try {
-      const response = await getFiles({
-        page: 1,
-        pageSize: 50,
-      });
-      
+      const response = await getRecentFiles();
       if (response.code === 200 && response.data) {
-        const sortedFiles = response.data
-          .filter(file => file.type === 'file')
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-          .slice(0, 30);
-        setFiles(sortedFiles);
+        setFiles(response.data.filter((file) => file.type === "file"));
       } else {
         setFiles([]);
       }
@@ -43,6 +38,8 @@ export default function Recent() {
       setLoading(false);
     }
   };
+
+  const isPreviewable = (file: FileItem) => file.mime_type.startsWith("image/") || file.mime_type.startsWith("video/");
 
   if (loading) {
     return (
@@ -57,21 +54,14 @@ export default function Recent() {
       <Sidebar activeTab="recent" onUploadFile={() => setShowUploadDialog(true)} onCreateFolder={() => {}} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar
-          pageTitle="最近使用"
-          showBackButton
-        />
+        <TopBar pageTitle="最近使用" showBackButton showUserInfo showRefreshButton onRefresh={fetchRecent} />
 
         <main className="flex-1 overflow-auto p-8">
-          {/* Page Header */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-[#0f172a] mb-2">最近使用</h2>
-            <p className="text-sm text-[#64748b]">
-              查看您最近访问过的文件，快速找到您需要的内容。
-            </p>
+            <p className="text-sm text-[#64748b]">查看您最近访问过的文件，快速找到您需要的内容。</p>
           </div>
 
-          {/* File Grid */}
           {files.length === 0 ? (
             <div className="bg-white rounded-xl p-16 text-center">
               <div className="w-20 h-20 bg-[#fafafa] rounded-full flex items-center justify-center mx-auto mb-6">
@@ -85,20 +75,24 @@ export default function Recent() {
               {files.map((file) => (
                 <div
                   key={file.id}
+                  onClick={() => window.open(getPreviewUrl(file.id), "_blank")}
                   className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer group"
                 >
-                  {/* File Preview */}
-                  <div className="aspect-square bg-[#fafafa] flex items-center justify-center">
-                    <div className="w-16 h-16">
-                      {getFileIcon(file.type, file.mime_type)}
-                    </div>
+                  <div className="aspect-square bg-[#fafafa] flex items-center justify-center overflow-hidden">
+                    {isPreviewable(file) ? (
+                      <img
+                        src={getThumbnailUrl(file.id)}
+                        alt={file.filename}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-16 h-16">{getFileIcon(file.type, file.mime_type)}</div>
+                    )}
                   </div>
-                  
-                  {/* File Info */}
+
                   <div className="p-4">
-                    <div className="font-semibold text-[#0f172a] truncate text-sm mb-1">
-                      {file.filename}
-                    </div>
+                    <div className="font-semibold text-[#0f172a] truncate text-sm mb-1">{file.filename}</div>
                     <div className="flex items-center justify-between text-xs text-[#64748b]">
                       <span>{formatFileSize(file.size)}</span>
                       <span>{formatDate(file.created_at)}</span>
@@ -111,7 +105,6 @@ export default function Recent() {
         </main>
       </div>
 
-      {/* Floating Action Button */}
       <div className="fixed bottom-8 right-8 z-50">
         <button
           onClick={() => setShowUploadDialog(true)}
@@ -121,7 +114,16 @@ export default function Recent() {
         </button>
       </div>
 
-      {/* Toast Notification */}
+      <SmartUploadDialog
+        open={showUploadDialog}
+        onClose={() => setShowUploadDialog(false)}
+        onSuccess={() => {
+          setShowUploadDialog(false);
+          fetchRecent();
+          setToast({ open: true, message: "上传成功", type: "success" });
+        }}
+      />
+
       <Toast
         open={toast.open}
         onClose={() => setToast({ ...toast, open: false })}

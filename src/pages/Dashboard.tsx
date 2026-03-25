@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Grid3x3, List, SlidersHorizontal, Share2, Trash2, Upload, Edit3 } from "lucide-react";
+import { Grid3x3, List, Share2, Trash2, Edit3, FolderOpen } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import ShareDialog from "@/components/ShareDialog";
@@ -9,7 +9,7 @@ import CreateFolderDialog from "@/components/CreateFolderDialog";
 import RenameDialog from "@/components/RenameDialog";
 import SmartUploadDialog from "@/components/SmartUploadDialog";
 import FilePreviewModal from "@/components/FilePreviewModal";
-import { getFiles, deleteFile, createFolder, renameFile } from "@/services/fileService";
+import { getFiles, deleteFile, createFolder, renameFile, getThumbnailUrl } from "@/services/fileService";
 import type { FileItem } from "@/services/fileService";
 import { getFileIcon, formatFileSize, formatDate } from "@/utils/fileUtils";
 
@@ -33,6 +33,8 @@ export default function Dashboard() {
   const [folderPath, setFolderPath] = useState<Array<{ id: number | null; name: string }>>([
     { id: null, name: '全部文件' }
   ]);
+  const [isDragOverPage, setIsDragOverPage] = useState(false);
+  const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
 
   const fetchFiles = async () => {
     setLoading(true);
@@ -138,6 +140,35 @@ export default function Dashboard() {
     }
   };
 
+  const isImageFile = (file: FileItem) => file.type === 'file' && file.mime_type?.startsWith('image/');
+
+  const handlePageDragOver = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOverPage(true);
+  };
+
+  const handlePageDragLeave = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const related = e.relatedTarget as Node | null;
+    if (!related || !(e.currentTarget as HTMLElement).contains(related)) {
+      setIsDragOverPage(false);
+    }
+  };
+
+  const handlePageDrop = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOverPage(false);
+
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length === 0) return;
+
+    setDroppedFiles(files);
+    setSmartUploadOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#f6f6f8]">
@@ -164,12 +195,21 @@ export default function Dashboard() {
           searchValue={searchKeyword}
           onSearchChange={setSearchKeyword}
           onSearchSubmit={fetchFiles}
-          showMySharesButton
           showUserInfo
         />
 
         {/* Content Area - Editorial Spacing (p-8) */}
-        <main className="flex-1 overflow-auto p-8">
+        <main
+          className="flex-1 overflow-auto p-8 relative"
+          onDragOver={handlePageDragOver}
+          onDragLeave={handlePageDragLeave}
+          onDrop={handlePageDrop}
+        >
+          {isDragOverPage && (
+            <div className="absolute inset-6 rounded-2xl border-2 border-dashed border-[#1121d4] bg-[#1121d4]/5 flex items-center justify-center text-[#1121d4] font-semibold z-40">
+              松开鼠标即可上传
+            </div>
+          )}
           {/* Breadcrumb Navigation */}
           <div className="flex items-center gap-2 mb-6">
             {folderPath.map((folder, index) => (
@@ -194,26 +234,28 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* Tabs and View Controls - No borders, background shifts */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex gap-8">
-              <button className="text-sm font-bold text-[#1121d4] pb-3 border-b-2 border-[#1121d4]">
+          {/* Header Actions */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="px-3 py-1.5 rounded-lg bg-[#1121d4]/10 text-[#1121d4] text-sm font-semibold flex items-center gap-2">
+                <FolderOpen className="w-4 h-4" />
                 我的文件
-              </button>
-              <button className="text-sm font-semibold text-[#64748b] hover:text-[#0f172a] pb-3 transition-colors">
-                共享文件
-              </button>
-              <button className="text-sm font-semibold text-[#64748b] hover:text-[#0f172a] pb-3 transition-colors">
-                工作
-              </button>
+              </div>
+              <span className="text-sm text-[#64748b]">共 {files.length} 项</span>
             </div>
 
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setSmartUploadOpen(true)}
+                className="px-4 py-2 rounded-lg bg-[#1121d4] text-white text-sm font-semibold hover:bg-[#0d19a8] transition-colors"
+              >
+                上传文件
+              </button>
+              <button
                 onClick={() => setViewMode("grid")}
                 className={`p-2.5 rounded-lg transition-all ${
-                  viewMode === "grid" 
-                    ? "bg-[#1121d4]/10 text-[#1121d4]" 
+                  viewMode === "grid"
+                    ? "bg-[#1121d4]/10 text-[#1121d4]"
                     : "text-[#64748b] hover:bg-[#f6f6f8]"
                 }`}
                 title="网格视图"
@@ -223,44 +265,30 @@ export default function Dashboard() {
               <button
                 onClick={() => setViewMode("list")}
                 className={`p-2.5 rounded-lg transition-all ${
-                  viewMode === "list" 
-                    ? "bg-[#1121d4]/10 text-[#1121d4]" 
+                  viewMode === "list"
+                    ? "bg-[#1121d4]/10 text-[#1121d4]"
                     : "text-[#64748b] hover:bg-[#f6f6f8]"
                 }`}
                 title="列表视图"
               >
                 <List className="h-4 w-4" />
               </button>
-              <button 
-                className="p-2.5 rounded-lg text-[#64748b] hover:bg-[#f6f6f8] transition-all"
-                title="详细信息"
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Drag and Drop Upload Area */}
-          <div 
-            onClick={() => setSmartUploadOpen(true)}
-            className="mb-6 bg-white rounded-xl p-16 border-2 border-dashed border-[#e2e8f0] hover:border-[#1121d4] transition-colors cursor-pointer"
-          >
-            <div className="flex flex-col items-center justify-center text-center">
-              <div className="w-16 h-16 bg-[#1121d4]/10 rounded-2xl flex items-center justify-center mb-6">
-                <Upload className="h-8 w-8 text-[#1121d4]" />
-              </div>
-              <h3 className="text-xl font-bold text-[#0f172a] mb-2">拖拽文件到这里上传</h3>
-              <p className="text-sm text-[#64748b] mb-6">
-                支持拖拽上传，单个文件最大支持 10GB
-              </p>
-              <div className="text-sm font-semibold text-[#1121d4] hover:text-[#0d19a8] transition-colors">
-                或点击选择文件上传
-              </div>
             </div>
           </div>
 
           {/* File List - Floating card with no internal borders */}
-          {files.length > 0 && (
+          {files.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+              <div className="text-base font-semibold text-[#0f172a] mb-2">当前目录暂无文件</div>
+              <div className="text-sm text-[#64748b] mb-4">点击右上角“上传文件”，或直接把文件拖拽到页面任意位置上传</div>
+              <button
+                onClick={() => setSmartUploadOpen(true)}
+                className="px-4 py-2 rounded-lg bg-[#1121d4] text-white text-sm font-semibold hover:bg-[#0d19a8] transition-colors"
+              >
+                立即上传
+              </button>
+            </div>
+          ) : (
             <div className="bg-white rounded-xl shadow-sm">
               {viewMode === "list" ? (
                 <>
@@ -288,9 +316,18 @@ export default function Dashboard() {
                       }}
                     >
                       <div className="col-span-5 flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0">
-                          {getFileIcon(file.type, file.mime_type)}
-                    </div>
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-[#f8fafc] border border-[#eef2f7]">
+                          {isImageFile(file) ? (
+                            <img
+                              src={getThumbnailUrl(file.id)}
+                              alt={file.filename}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            getFileIcon(file.type, file.mime_type)
+                          )}
+                        </div>
                         <div className="min-w-0">
                           <div className="font-semibold text-[#0f172a] truncate text-sm">
                             {file.filename}
@@ -355,10 +392,19 @@ export default function Dashboard() {
                       }
                     }}
                   >
-                    <div className="w-full aspect-square bg-[#f6f6f8] rounded-lg flex items-center justify-center mb-3">
-                      <div className="w-16 h-16">
-                        {getFileIcon(file.type, file.mime_type)}
-                      </div>
+                    <div className="w-full aspect-square bg-[#f6f6f8] rounded-lg flex items-center justify-center mb-3 overflow-hidden border border-[#eef2f7]">
+                      {isImageFile(file) ? (
+                        <img
+                          src={getThumbnailUrl(file.id)}
+                          alt={file.filename}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-16 h-16">
+                          {getFileIcon(file.type, file.mime_type)}
+                        </div>
+                      )}
                     </div>
                     <div className="text-sm font-semibold text-[#0f172a] truncate mb-1">
                       {file.filename}
@@ -449,13 +495,19 @@ export default function Dashboard() {
       {/* Smart Upload Dialog */}
       <SmartUploadDialog
         open={smartUploadOpen}
-        onClose={() => setSmartUploadOpen(false)}
+        onClose={() => {
+          setSmartUploadOpen(false);
+          setDroppedFiles([]);
+        }}
         onSuccess={() => {
           setSmartUploadOpen(false);
+          setDroppedFiles([]);
           fetchFiles();
           setToast({ open: true, message: "文件上传成功", type: "success" });
         }}
         parentId={currentFolderId}
+        droppedFiles={droppedFiles}
+        onDroppedFilesHandled={() => setDroppedFiles([])}
       />
 
       {/* File Preview Modal */}

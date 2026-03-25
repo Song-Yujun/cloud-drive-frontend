@@ -17,6 +17,12 @@ export interface FileItem {
   file_hash: string;
 }
 
+const getToken = () => localStorage.getItem('token') || '';
+
+export const getPreviewUrl = (fileId: number) => `/api/preview/${fileId}?token=${encodeURIComponent(getToken())}`;
+export const getThumbnailUrl = (fileId: number) => `/api/preview/thumb/${fileId}?token=${encodeURIComponent(getToken())}`;
+export const getDownloadUrl = (fileId: number) => `/api/files/download/${fileId}?token=${encodeURIComponent(getToken())}`;
+
 export interface FileListResponse {
   code: number;
   current_parent_id: number | null;
@@ -25,6 +31,22 @@ export interface FileListResponse {
   pageNum: number;
   pageSize: number;
   total: number;
+}
+
+export interface UserProfile {
+  id: number;
+  username: string;
+  nickname?: string;
+  email?: string;
+  avatar?: string;
+  created_at?: string;
+}
+
+export interface UserInfoResponse {
+  code: number;
+  msg?: string;
+  message?: string;
+  data: UserProfile;
 }
 
 // 获取文件列表
@@ -51,6 +73,40 @@ export const uploadFile = async (formData: FormData) => {
   return apiClient.post('/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+};
+
+// 获取最近文件（后端专用接口）
+export const getRecentFiles = async (): Promise<FileListResponse> => {
+  const response: FileListResponse = await apiClient.get('/files/recent');
+  return response;
+};
+
+// 获取图片文件（后端专用接口）
+export const getPhotoFiles = async (): Promise<FileListResponse> => {
+  const response: FileListResponse = await apiClient.get('/files/photos');
+  return response;
+};
+
+// 获取视频文件（后端专用接口）
+export const getVideoFiles = async (): Promise<FileListResponse> => {
+  const response: FileListResponse = await apiClient.get('/files/videos');
+  return response;
+};
+
+// 获取用户信息
+export const getUserInfo = async (): Promise<UserInfoResponse> => {
+  const response: UserInfoResponse = await apiClient.get('/user/info');
+  return response;
+};
+
+// 上传头像
+export const uploadAvatar = async (file: File): Promise<UserInfoResponse> => {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  const response: UserInfoResponse = await apiClient.post('/user/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response;
 };
 
 // 新建文件夹

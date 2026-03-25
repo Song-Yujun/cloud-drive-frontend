@@ -2,31 +2,65 @@
 import apiClient from '@/lib/api';
 
 export interface LoginRequest {
-  username: string; // 或者 email，取决于你后端接收的字段
+  username: string;
   password: string;
 }
 
 export interface LoginResponse {
-  token: string;
-  user?: {
-    id: number;
-    username: string;
-    email?: string;
+  code: number;
+  message: string;
+  data: {
+    token: string;
+    user_id?: number;
   };
-  // 根据你的后端实际返回结构调整，比如可能还有 code, message 等
 }
 
-// 登录函数
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  new_password: string;
+}
+
+export interface ChangePasswordRequest {
+  old_password: string;
+  new_password: string;
+}
+
+// 登录
 export const login = async (data: LoginRequest): Promise<LoginResponse> => {
-  // 注意：apiClient 的响应拦截器已经返回了 response.data，所以这里直接得到的就是数据
   const response: LoginResponse = await apiClient.post('/login', data);
-  console.log('登录响应:', response);
   return response;
 };
 
-// 注册函数 (可选，稍后可以用)
+// 注册
 export const register = async (data: LoginRequest & { email?: string }): Promise<any> => {
   const response = await apiClient.post('/register', data);
-  console.log('注册响应:', response);
   return response;
+};
+
+// 忘记密码：发送验证码
+export const forgotPassword = async (
+  data: ForgotPasswordRequest
+): Promise<{ code: number; message?: string; msg?: string }> => {
+  const response = await apiClient.post('/forgot-password', data);
+  return response as unknown as { code: number; message?: string; msg?: string };
+};
+
+// 重置密码
+export const resetPassword = async (
+  data: ResetPasswordRequest
+): Promise<{ code: number; message?: string; msg?: string }> => {
+  const response = await apiClient.post('/reset-password', data);
+  return response as unknown as { code: number; message?: string; msg?: string };
+};
+
+// 登录后修改密码
+export const changePassword = async (
+  data: ChangePasswordRequest
+): Promise<{ code: number; message?: string; msg?: string }> => {
+  const response = await apiClient.post('/user/change-password', data);
+  return response as unknown as { code: number; message?: string; msg?: string };
 };
