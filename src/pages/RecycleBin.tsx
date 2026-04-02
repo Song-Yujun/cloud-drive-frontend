@@ -202,7 +202,7 @@ export default function RecycleBin() {
         <TopBar pageTitle="回收站" showRefreshButton onRefresh={fetchRecycleBinFiles} />
 
         <main className="flex-1 overflow-y-auto px-8 py-6">
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full">
             {/* Info Banner */}
             {files.length > 0 && (
               <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
@@ -281,7 +281,7 @@ export default function RecycleBin() {
                         type="checkbox"
                         checked={selectedFiles.size === files.length && files.length > 0}
                         onChange={toggleSelectAll}
-                        className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0"
+                        className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-0 focus:ring-offset-0"
                       />
                     </div>
                     <div className="col-span-4 text-xs font-medium text-slate-500">文件名</div>
@@ -309,7 +309,7 @@ export default function RecycleBin() {
                           type="checkbox"
                           checked={selectedFiles.has(file.id)}
                           onChange={() => toggleSelectFile(file.id)}
-                          className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0"
+                          className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-0 focus:ring-offset-0"
                         />
                       </div>
                       <div className="col-span-4 flex items-center gap-3 min-w-0">
