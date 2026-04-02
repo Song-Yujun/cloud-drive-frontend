@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Upload, Share2, ArrowLeft, RefreshCw, LogOut, ChevronDown, User, KeyRound, X, Loader2 } from "lucide-react";
-import { getUserInfo } from "@/services/fileService";
+import { Search, Upload, Share2, ArrowLeft, RefreshCw, LogOut, ChevronDown, User, KeyRound, X, Loader2, Settings } from "lucide-react";
+import { getUserInfo } from "@/services/userService";
 import { changePassword } from "@/services/authService";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import ProfileModal from "./ProfileModal";
+import type { UserProfile } from "@/services/userService";
 
 interface TopBarProps {
   pageTitle?: string;
@@ -51,6 +53,7 @@ export default function TopBar({
 }: TopBarProps) {
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileName, setProfileName] = useState("默认用户");
   const [profileInitials, setProfileInitials] = useState("DU");
   const [avatarUrl, setAvatarUrl] = useState<string>("");
@@ -79,13 +82,23 @@ export default function TopBar({
       const profile = res.data;
       if (!profile) return;
 
-      const displayName = (profile as any).nickname || profile.username || "默认用户";
+      const displayName = profile.nickname || profile.Username || "默认用户";
       setProfileName(displayName);
       setProfileInitials(displayName.slice(0, 2).toUpperCase());
       if (profile.avatar) setAvatarUrl(normalizeAvatarUrl(profile.avatar));
     } catch (error) {
       console.error("获取用户信息失败:", error);
     }
+  };
+
+  const handleProfileUpdate = (profile: UserProfile) => {
+    const displayName = profile.nickname || profile.Username || "默认用户";
+    setProfileName(displayName);
+    setProfileInitials(displayName.slice(0, 2).toUpperCase());
+    if (profile.avatar) setAvatarUrl(normalizeAvatarUrl(profile.avatar));
+
+    // 触发全局事件，通知其他组件更新
+    window.dispatchEvent(new CustomEvent("profile-updated", { detail: profile }));
   };
 
   const openResetModal = () => {
@@ -146,6 +159,18 @@ export default function TopBar({
 
   useEffect(() => {
     if (showUserInfo) fetchUserProfile();
+
+    // 监听全局的个人信息更新事件
+    const handleProfileUpdated = (event: any) => {
+      const profile = event.detail;
+      const displayName = profile.nickname || profile.Username || "默认用户";
+      setProfileName(displayName);
+      setProfileInitials(displayName.slice(0, 2).toUpperCase());
+      if (profile.avatar) setAvatarUrl(normalizeAvatarUrl(profile.avatar));
+    };
+
+    window.addEventListener("profile-updated", handleProfileUpdated);
+    return () => window.removeEventListener("profile-updated", handleProfileUpdated);
   }, [showUserInfo]);
 
   return (
@@ -237,10 +262,20 @@ export default function TopBar({
                         </div>
                         <div className="min-w-0">
                           <div className="text-[18px] font-bold text-[#0f172a] truncate dark:text-white">{profileName}</div>
-                          <div className="text-sm text-[#64748b] truncate dark:text-[#94a3b8]">个人中心</div>
                         </div>
                       </div>
                     </div>
+
+                    <button
+                      onClick={() => {
+                        setShowDropdown(false);
+                        setShowProfileModal(true);
+                      }}
+                      className="w-full flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[#0f172a] hover:bg-[#f8fafc] dark:text-white dark:hover:bg-[#1e293b]"
+                    >
+                      <User className="w-4 h-4 text-[#64748b]" />
+                      个人信息
+                    </button>
 
                     <button
                       onClick={() => {
@@ -304,6 +339,13 @@ export default function TopBar({
           </div>
         </div>
       )}
+
+      <ProfileModal
+        open={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        onProfileUpdate={handleProfileUpdate}
+        viewOnly={true}
+      />
     </>
   );
 }

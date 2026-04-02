@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Grid3x3, List, Share2, Trash2, Edit3, FolderOpen } from "lucide-react";
+import { Grid3x3, List, Share2, Trash2, Edit3, FolderOpen, FolderPlus, Upload } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import ShareDialog from "@/components/ShareDialog";
@@ -180,11 +180,9 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-[#f6f6f8]">
       {/* Sidebar */}
-      <Sidebar 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab} 
-        onUploadFile={() => setSmartUploadOpen(true)}
-        onCreateFolder={() => setCreateFolderOpen(true)}
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
       {/* Main Content */}
@@ -246,9 +244,17 @@ export default function Dashboard() {
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setSmartUploadOpen(true)}
-                className="px-4 py-2 rounded-lg bg-[#1121d4] text-white text-sm font-semibold hover:bg-[#0d19a8] transition-colors"
+                onClick={() => setCreateFolderOpen(true)}
+                className="px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors flex items-center gap-2"
               >
+                <FolderPlus className="w-4 h-4" />
+                新建文件夹
+              </button>
+              <button
+                onClick={() => setSmartUploadOpen(true)}
+                className="px-4 py-2 rounded-lg bg-[#1121d4] text-white text-sm font-semibold hover:bg-[#0d19a8] transition-colors flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
                 上传文件
               </button>
               <button

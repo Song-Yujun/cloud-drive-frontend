@@ -88,7 +88,7 @@ export default function ShareAccess() {
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
             <Cloud className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-bold text-slate-900">个人云盘</span>
+          <span className="text-xl font-bold text-slate-900">轻传文件系统</span>
         </div>
         <Button
           variant="default"
@@ -210,7 +210,7 @@ export default function ShareAccess() {
           {/* Footer Tips */}
           <div className="mt-6 text-center">
             <p className="text-sm text-slate-600">
-              使用个人云盘，安全分享您的文件
+              使用轻传文件系统，安全分享您的文件
             </p>
             <button
               onClick={() => navigate("/register")}

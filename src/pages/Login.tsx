@@ -161,7 +161,7 @@ export default function LoginPage() {
           <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
             <Cloud className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-semibold text-slate-900 dark:text-white">个人云盘</span>
+          <span className="text-xl font-semibold text-slate-900 dark:text-white">轻传文件系统</span>
         </div>
       </header>
 

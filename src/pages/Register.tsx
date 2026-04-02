@@ -94,7 +94,7 @@ export default function RegisterPage() {
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
             <Cloud className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-bold text-slate-900">个人云盘</span>
+          <span className="text-xl font-bold text-slate-900">轻传文件系统</span>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-slate-600">支持</span>
