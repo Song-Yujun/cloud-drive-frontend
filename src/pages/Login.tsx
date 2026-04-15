@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Mail, Lock, Loader2, Eye, EyeOff, Cloud, Shield, CheckCircle, ArrowRight, KeyRound, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Mail, Lock, Loader2, Eye, EyeOff, Cloud, Shield, CheckCircle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { login, forgotPassword, resetPassword } from "@/services/authService";
+import { login } from "@/services/authService";
+import ForgotPasswordModal from "@/components/ForgotPasswordModal";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -13,19 +14,9 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const [resetOpen, setResetOpen] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
-  const [resetToken, setResetToken] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmNewPassword, setConfirmNewPassword] = useState("");
-  const [sendingCode, setSendingCode] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const [resetMsg, setResetMsg] = useState("");
-  const [resetError, setResetError] = useState("");
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
 
   const navigate = useNavigate();
-  const location = useLocation();
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -61,98 +52,13 @@ export default function LoginPage() {
     }
   };
 
-  const openResetModal = () => {
-    setResetOpen(true);
-    setResetError("");
-    setResetMsg("");
-  };
-
-  const closeResetModal = () => {
-    setResetOpen(false);
-    setResetToken("");
-    setNewPassword("");
-    setConfirmNewPassword("");
-    setResetError("");
-    setResetMsg("");
-  };
-
-  const handleSendResetCode = async () => {
-    setResetError("");
-    setResetMsg("");
-    if (!resetEmail) {
-      setResetError("请输入邮箱");
-      return;
-    }
-
-    try {
-      setSendingCode(true);
-      const res = await forgotPassword({ email: resetEmail });
-      if (res.code === 200) setResetMsg(res.message || res.msg || "验证码已发送，请查收邮箱");
-      else setResetError(res.message || res.msg || "发送失败");
-    } catch (err: any) {
-      setResetError(err.response?.data?.message || err.message || "发送失败");
-    } finally {
-      setSendingCode(false);
-    }
-  };
-
-  const handleResetPassword = async () => {
-    setResetError("");
-    setResetMsg("");
-
-    if (!resetToken || !newPassword) {
-      setResetError("请填写重置令牌和新密码");
-      return;
-    }
-    if (newPassword.length < 6) {
-      setResetError("新密码至少 6 位");
-      return;
-    }
-    if (newPassword !== confirmNewPassword) {
-      setResetError("两次输入的新密码不一致");
-      return;
-    }
-
-    try {
-      setResetting(true);
-      const res = await resetPassword({ token: resetToken, new_password: newPassword });
-      if (res.code === 200) {
-        setResetMsg(res.message || res.msg || "密码重置成功，请使用新密码登录");
-        setTimeout(() => closeResetModal(), 1200);
-      } else {
-        setResetError(res.message || res.msg || "重置失败");
-      }
-    } catch (err: any) {
-      setResetError(err.response?.data?.message || err.message || "重置失败");
-    } finally {
-      setResetting(false);
-    }
-  };
-
   useEffect(() => {
     const remembered = localStorage.getItem("remember-username");
     if (remembered) {
       setUsername(remembered);
       setRememberMe(true);
     }
-
-    const params = new URLSearchParams(location.search);
-    const resetFlag = params.get("reset") === "1";
-    const tokenFromUrl = params.get("token") || "";
-    const isResetPath = location.pathname === "/reset-password";
-
-    if (tokenFromUrl) {
-      setResetToken(tokenFromUrl);
-      setResetOpen(true);
-      setResetError("");
-      setResetMsg("检测到邮件重置链接，请直接输入新密码并提交");
-      return;
-    }
-
-    if (resetFlag || isResetPath) {
-      openResetModal();
-    }
-  }, [location.pathname, location.search]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f8fbff] via-[#f5f7ff] to-[#eef3ff] dark:from-[#020617] dark:via-[#0b1224] dark:to-[#0f172a] flex flex-col">
@@ -186,7 +92,7 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-200">密码</Label>
-                    <button type="button" onClick={openResetModal} className="text-sm text-blue-600 hover:text-blue-700 font-medium">忘记密码？</button>
+                    <button type="button" onClick={() => setForgotPasswordOpen(true)} className="text-sm text-blue-600 hover:text-blue-700 font-medium">忘记密码？</button>
                   </div>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -250,45 +156,7 @@ export default function LoginPage() {
 
       <footer className="px-8 py-4 text-center text-xs text-slate-500 dark:text-slate-400">© 2024 Personal Cloud Drive Inc. 隐私政策 · 服务条款</footer>
 
-      {resetOpen && (
-        <div className="fixed inset-0 z-[90] bg-black/45 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-[#e2e8f0] dark:border-[#334155]">
-            <div className="p-5 border-b border-[#e2e8f0] dark:border-[#334155] flex items-center justify-between">
-              <h3 className="text-lg font-bold text-[#0f172a] dark:text-white flex items-center gap-2"><KeyRound className="w-5 h-5" />重置密码</h3>
-              <button onClick={closeResetModal} className="p-2 rounded-lg hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b]"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="p-5 space-y-4">
-              {resetError && <div className="p-2.5 rounded-lg text-sm text-red-600 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30">{resetError}</div>}
-              {resetMsg && <div className="p-2.5 rounded-lg text-sm text-emerald-700 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30">{resetMsg}</div>}
-
-              <div className="space-y-1.5">
-                <Label>邮箱</Label>
-                <Input value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="请输入注册邮箱" />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>重置令牌（邮箱中的 token）</Label>
-                <div className="space-y-2">
-                  <Input value={resetToken} onChange={(e) => setResetToken(e.target.value)} placeholder="请输入邮件中的重置令牌" />
-                  <Button type="button" variant="outline" onClick={handleSendResetCode} disabled={sendingCode} className="w-full">{sendingCode ? "发送中" : "发送重置邮件"}</Button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>新密码</Label>
-                <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="至少 6 位" />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>确认新密码</Label>
-                <Input type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder="再次输入新密码" />
-              </div>
-
-              <Button type="button" className="w-full" onClick={handleResetPassword} disabled={resetting}>{resetting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />重置中...</> : "确认重置"}</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ForgotPasswordModal open={forgotPasswordOpen} onClose={() => setForgotPasswordOpen(false)} />
     </div>
   );
 }
